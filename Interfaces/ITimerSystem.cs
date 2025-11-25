@@ -56,5 +56,25 @@ namespace Timer
         /// 根据回调查找计时器
         /// </summary>
         ITimerEntity FindTimer(TimerCallback callback);
+
+        /// <summary>
+        /// 获取当前活跃计时器数量
+        /// </summary>
+        int ActiveTimerCount { get; }
+
+        /// <summary>
+        /// 清理所有计时器
+        /// </summary>
+        void ClearAllTimers();
+
+        /// <summary>
+        /// 暂停指定回调的计时器
+        /// </summary>
+        void PauseTimer(TimerCallback callback);
+
+        /// <summary>
+        /// 恢复指定回调的计时器
+        /// </summary>
+        void ResumeTimer(TimerCallback callback);
     }
 }

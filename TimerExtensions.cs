@@ -57,35 +57,57 @@ namespace Timer
         /// </summary>
         public static ITimerEntity AddCountdown(this ITimerSystem timersystem, float totalSeconds, Action<float> onTick, Action onComplete, bool useUnscaledTime = false)
         {
-            float remainingTime = totalSeconds;
-
-            // 先声明委托变量
-            TimerCallback countdownCallback = null;
-            ITimerEntity timerEntity = null;
-
-            // 然后给委托变量赋值
-            countdownCallback = (userData) =>
+            var countdownData = new CountdownData
             {
-                remainingTime -= useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
-
-                if (remainingTime < 0)
-                    remainingTime = 0;
-
-                onTick?.Invoke(remainingTime);
-
-                if (remainingTime <= 0)
-                {
-                    onComplete?.Invoke();
-                    if (timerEntity != null)
-                    {
-                        timersystem.RemoveTimer(timerEntity);
-                    }
-                }
+                remainingTime = totalSeconds,
+                onTick = onTick,
+                onComplete = onComplete,
+                useUnscaledTime = useUnscaledTime,
+                timerSystem = timersystem
             };
 
-            // 每帧更新
-            timerEntity = timersystem.CreateTimer(TimeSpan.FromSeconds(FrameInterval), -1, countdownCallback, null, useUnscaledTime);
+            ITimerEntity timerEntity = timersystem.CreateTimer(
+                TimeSpan.FromSeconds(FrameInterval), 
+                -1, 
+                CountdownCallback, 
+                countdownData, 
+                useUnscaledTime
+            );
+            
+            countdownData.timerEntity = timerEntity;
             return timerEntity;
+        }
+
+        private class CountdownData
+        {
+            public float remainingTime;
+            public Action<float> onTick;
+            public Action onComplete;
+            public bool useUnscaledTime;
+            public ITimerEntity timerEntity;
+            public ITimerSystem timerSystem;
+        }
+
+        private static void CountdownCallback(object userData)
+        {
+            if (userData is CountdownData data)
+            {
+                data.remainingTime -= data.useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+
+                if (data.remainingTime < 0)
+                    data.remainingTime = 0;
+
+                data.onTick?.Invoke(data.remainingTime);
+
+                if (data.remainingTime <= 0)
+                {
+                    data.onComplete?.Invoke();
+                    if (data.timerEntity != null)
+                    {
+                        data.timerSystem.RemoveTimer(data.timerEntity);
+                    }
+                }
+            }
         }
     }
 }

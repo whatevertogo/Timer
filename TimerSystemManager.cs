@@ -79,27 +79,58 @@ namespace Timer
             }
         }
 
-        public ITimerEntity CreateTimer(TimeSpan interval, int repeat, TimerCallback callback, object userData = null, bool useUnscaledTime = false)
+        public ITimerEntity CreateTimer(TimeSpan interval,//间隔事件
+         int repeat,   //重复次数 
+         TimerCallback callback,//回调函数
+          object userData = null,//传递参数
+           bool useUnscaledTime = false//是否使用不受时间缩放影响的时间
+           )
         {
-            if (_callbackToTimer.TryGetValue(callback, out var existingTimer))
+            // 参数校验
+            if (callback == null)
             {
-                existingTimer.Pause();
-                _timerPool.Release(existingTimer);
-                _activeTimers.Remove(existingTimer);
+                Debug.LogError("[TimerSystem] Callback cannot be null");
+                return null;
+            }
+            if (interval.TotalSeconds < 0)
+            {
+                Debug.LogError($"[TimerSystem] Interval cannot be negative: {interval.TotalSeconds}");
+                return null;
+            }
+            if (repeat == 0 || repeat < -1)
+            {
+                Debug.LogError($"[TimerSystem] Repeat must be -1 (infinite) or > 0, got: {repeat}");
+                return null;
             }
 
             var timer = _timerPool.Get();
             timer.Initialize(interval, repeat, callback, userData, useUnscaledTime);
             _activeTimers.Add(timer);
+            
+            // 注意：不再强制移除旧的同名回调，允许多个计时器使用相同回调
+            // 但 FindTimer 会返回最后一个创建的
             _callbackToTimer[callback] = timer;
+            
             return timer;
         }
 
         public void RemoveTimer(ITimerEntity timer)
         {
+            if (timer == null) return;
+            
             if (timer is TimerEntity entity)
             {
                 entity.Pause();
+                _activeTimers.Remove(entity);
+                
+                // 从字典中移除（只移除当前计时器的引用）
+                var callback = entity.GetCallback();
+                if (_callbackToTimer.TryGetValue(callback, out var cachedTimer) && cachedTimer == entity)
+                {
+                    _callbackToTimer.Remove(callback);
+                }
+                
+                _timerPool.Release(entity);
             }
         }
 
@@ -107,6 +138,56 @@ namespace Timer
         {
             return _callbackToTimer.TryGetValue(callback, out var timer) && timer.IsRunning ? timer : null;
         }
+
+        /// <summary>
+        /// 获取当前活跃计时器数量
+        /// </summary>
+        public int ActiveTimerCount => _activeTimers.Count;
+
+        /// <summary>
+        /// 清理所有计时器
+        /// </summary>
+        public void ClearAllTimers()
+        {
+            Shutdown();
+            Initialize();
+        }
+
+        /// <summary>
+        /// 暂停指定回调的计时器
+        /// </summary>
+        public void PauseTimer(TimerCallback callback)
+        {
+            var timer = FindTimer(callback);
+            timer?.Pause();
+        }
+
+        /// <summary>
+        /// 恢复指定回调的计时器
+        /// </summary>
+        public void ResumeTimer(TimerCallback callback)
+        {
+            if (_callbackToTimer.TryGetValue(callback, out var timer))
+            {
+                timer.Resume();
+            }
+        }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// 调试：输出所有活跃计时器
+        /// </summary>
+        public void LogActiveTimers()
+        {
+            Debug.Log($"[TimerSystem] Active Timers: {_activeTimers.Count}");
+            foreach (var timer in _activeTimers)
+            {
+                var callback = timer.GetCallback();
+                var methodName = callback?.Method.Name ?? "<null>";
+                Debug.Log($"  - {methodName}, Remaining: {timer.RemainingRepeatCount}, Interval: {timer.Interval.TotalSeconds:F2}s");
+            }
+        }
+#endif
 
         private void OnDestroy()
         {
