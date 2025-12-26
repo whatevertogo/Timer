@@ -54,33 +54,37 @@ namespace Timer
         {
             UnscaledDeltaTime = TimeSpan.FromSeconds(Time.unscaledDeltaTime);
             DeltaTime = TimeSpan.FromSeconds(Time.unscaledDeltaTime * TimeScale);
-            
+
             UnscaledElapsedTime += UnscaledDeltaTime;
             ElapsedTime += DeltaTime;
-            
+
             UpdateTimers();
         }
 
         private void UpdateTimers()
         {
-            for (int i = _activeTimers.Count - 1; i >= 0; i--)
+            // 第一阶段:更新
+            foreach (var timer in _activeTimers)
             {
-                var timer = _activeTimers[i];
-                
+                if (timer.IsRunning)
+                    timer.Update(timer.UseUnscaledTime ? UnscaledDeltaTime : DeltaTime);
+            }
+
+            // 第二阶段:清理(用 List.RemoveAll)
+            _activeTimers.RemoveAll(timer =>
+            {
                 if (!timer.IsRunning)
                 {
-                    _activeTimers.RemoveAt(i);
                     _callbackToTimer.Remove(timer.GetCallback());
                     _timerPool.Release(timer);
-                    continue;
+                    return true;
                 }
-
-                timer.Update(timer.UseUnscaledTime ? UnscaledDeltaTime : DeltaTime);
-            }
+                return false;
+            });
         }
 
         public ITimerEntity CreateTimer(TimeSpan interval,//间隔事件
-         int repeat,   //重复次数 
+         int repeat,   //重复次数
          TimerCallback callback,//回调函数
           object userData = null,//传递参数
            bool useUnscaledTime = false//是否使用不受时间缩放影响的时间
@@ -106,34 +110,36 @@ namespace Timer
             var timer = _timerPool.Get();
             timer.Initialize(interval, repeat, callback, userData, useUnscaledTime);
             _activeTimers.Add(timer);
-            
+
             // 注意：不再强制移除旧的同名回调，允许多个计时器使用相同回调
             // 但 FindTimer 会返回最后一个创建的
             _callbackToTimer[callback] = timer;
-            
+
             return timer;
         }
 
         public void RemoveTimer(ITimerEntity timer)
         {
             if (timer == null) return;
-            
+
             if (timer is TimerEntity entity)
             {
                 entity.Pause();
                 _activeTimers.Remove(entity);
-                
+
                 // 从字典中移除（只移除当前计时器的引用）
                 var callback = entity.GetCallback();
                 if (_callbackToTimer.TryGetValue(callback, out var cachedTimer) && cachedTimer == entity)
                 {
                     _callbackToTimer.Remove(callback);
                 }
-                
+
                 _timerPool.Release(entity);
             }
         }
-
+        /// <summary>
+        /// 查找指定回调的计时器（如果多个计时器使用同一个回调只返回最后一个）
+        /// </summary>
         public ITimerEntity FindTimer(TimerCallback callback)
         {
             return _callbackToTimer.TryGetValue(callback, out var timer) && timer.IsRunning ? timer : null;

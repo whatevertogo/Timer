@@ -52,11 +52,7 @@ namespace Timer
             if (obj == null) return;
 
             _resetAction?.Invoke(obj);
-
-            if (_pool.Count < _capacity)
-            {
-                _pool.Push(obj);
-            }
+            _pool.Push(obj);
         }
 
         /// <summary>

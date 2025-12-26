@@ -5,7 +5,6 @@ public class TimerExample : MonoBehaviour
 {
     // 存储需要手动管理的计时器引用
     private ITimerEntity _infiniteTimer;
-    private ITimerEntity _countdownTimer;
 
     private void Start()
     {
@@ -18,24 +17,20 @@ public class TimerExample : MonoBehaviour
         // 添加无限重复计时器：每0.5秒执行一次
         _infiniteTimer = TimerSystemManager.Instance.AddRepeat(0.5f, OnInfiniteTimer);
 
-        // 添加帧计时器：10帧后执行
-        TimerSystemManager.Instance.AddFrames(10, OnFrameTimer);
-
-        // 添加倒计时：5秒倒计时
-        _countdownTimer = TimerSystemManager.Instance.AddCountdown(5f, OnCountdownTick, OnCountdownComplete);
+        //可以通过object userData传递任何需要的数据自由扩展
 
         // 不受时间缩放影响的计时器
         TimerSystemManager.Instance.AddOnce(3f, OnUnscaledTimer, "不受缩放影响的计时器", true);
 
         // 演示计时器控制
         // 3秒后暂停无限计时器
-        TimerSystemManager.Instance.AddOnce(3f, _ => 
+        TimerSystemManager.Instance.AddOnce(3f, _ =>
         {
             Debug.Log("暂停无限计时器");
             _infiniteTimer?.Pause();
 
             // 2秒后恢复
-            TimerSystemManager.Instance.AddOnce(2f, __ => 
+            TimerSystemManager.Instance.AddOnce(2f, __ =>
             {
                 Debug.Log("恢复无限计时器");
                 _infiniteTimer?.Resume();
@@ -93,7 +88,7 @@ public class TimerExample : MonoBehaviour
             _countdownTimer = null;
         }
 
-        // 清理所有计时器
+        // 清理所有计时器(这将会清除TimerSystemManager中的所有计时器)
         TimerSystemManager.Instance.Shutdown();
     }
 }

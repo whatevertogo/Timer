@@ -62,7 +62,7 @@ namespace Timer
 
         public void Resume()
         {
-            if (RemainingRepeatCount != 0 || RemainingRepeatCount == -1)
+            if (RemainingRepeatCount != 0)
             {
                 IsRunning = true;
             }
