@@ -53,21 +53,6 @@ public class TimerExample : MonoBehaviour
         Debug.Log("无限重复计时器触发");
     }
 
-    private void OnFrameTimer(object userData)
-    {
-        Debug.Log("帧计时器触发");
-    }
-
-    private void OnCountdownTick(float remainingTime)
-    {
-        Debug.Log($"倒计时：{remainingTime:F1}秒");
-    }
-
-    private void OnCountdownComplete()
-    {
-        Debug.Log("倒计时完成！");
-    }
-
     private void OnUnscaledTimer(object userData)
     {
         Debug.Log($"不受缩放影响的计时器触发：{userData}");
@@ -80,12 +65,6 @@ public class TimerExample : MonoBehaviour
         {
             TimerSystemManager.Instance.RemoveTimer(_infiniteTimer);
             _infiniteTimer = null;
-        }
-
-        if (_countdownTimer != null)
-        {
-            TimerSystemManager.Instance.RemoveTimer(_countdownTimer);
-            _countdownTimer = null;
         }
 
         // 清理所有计时器(这将会清除TimerSystemManager中的所有计时器)
