@@ -5,10 +5,10 @@
 ## 特性
 
 - 🚀 **高性能对象池实现**，减少 GC 压力
-- 💡 **支持多种计时器类型**：一次性、有限重复、无限重复、帧计时器、倒计时
+- 💡 **支持多种计时器类型**：一次性、有限重复、无限重复、下一帧延迟
 - 🔄 **灵活的回调机制**，支持传递用户数据
 - ⏱ **时间控制**：支持 TimeScale 时间缩放和不受缩放影响的 UnscaledTime
-- 🎮 **计时器控制**：支持暂停、恢复、重置、手动移除
+- 🎮 **计时器控制**：支持暂停、恢复、手动移除
 - 🛠 **简单易用的 API 接口**
 - 🎯 **完整的接口抽象**，易于扩展和测试
 - 📊 **调试友好**：编辑器下支持查看活跃计时器信息
@@ -42,20 +42,6 @@ var infiniteTimer = TimerSystemManager.Instance.AddRepeat(0.5f, (data) => {
 
 ### 高级用法
 
-#### 倒计时
-
-```csharp
-TimerSystemManager.Instance.AddCountdown(
-    10f,                                    // 总时长10秒
-    (remainingTime) => {                    // 每帧回调
-        Debug.Log($"剩余时间：{remainingTime:F1}秒");
-    },
-    () => {                                 // 完成回调
-        Debug.Log("倒计时完成！");
-    }
-);
-```
-
 #### 带控制的计时器
 
 ```csharp
@@ -85,18 +71,25 @@ TimerSystemManager.Instance.AddOnce(
 );
 ```
 
-#### 帧计时器
+#### 下一帧执行
 
 ```csharp
-// 10帧后执行
-TimerSystemManager.Instance.AddFrames(10, (data) => {
-    Debug.Log("10帧后执行");
-});
-
-// 下一帧执行
+// 下一帧执行回调
 TimerSystemManager.Instance.AddNextFrame((data) => {
     Debug.Log("下一帧执行");
 });
+```
+
+#### 传递自定义数据
+
+```csharp
+// 通过 userData 传递任何需要的数据
+TimerSystemManager.Instance.AddOnce(2f, OnTimerComplete, "自定义数据");
+
+void OnTimerComplete(object userData)
+{
+    Debug.Log($"收到数据：{userData}");
+}
 ```
 
 #### 时间缩放
@@ -120,7 +113,7 @@ TimerSystemManager.Instance.TimeScale = 1f;
 |----------|------|
 | `CreateTimer(interval, repeat, callback, userData, useUnscaledTime)` | 创建计时器 |
 | `RemoveTimer(timer)` | 移除计时器 |
-| `FindTimer(callback)` | 根据回调查找计时器 |
+| `FindTimer(callback)` | 根据回调查找计时器（多个同回调时返回最后一个） |
 | `PauseTimer(callback)` | 暂停指定回调的计时器 |
 | `ResumeTimer(callback)` | 恢复指定回调的计时器 |
 | `ClearAllTimers()` | 清理所有计时器 |
@@ -149,8 +142,6 @@ TimerSystemManager.Instance.TimeScale = 1f;
 | `AddRepeat(seconds, callback, userData, useUnscaledTime)` | 添加无限重复计时器 |
 | `AddRepeat(seconds, repeatCount, callback, userData, useUnscaledTime)` | 添加有限次数重复计时器 |
 | `AddNextFrame(callback, userData)` | 添加延迟执行计时器（下一帧） |
-| `AddFrames(frames, callback, userData, useUnscaledTime)` | 添加延迟执行计时器（指定帧数） |
-| `AddCountdown(totalSeconds, onTick, onComplete, useUnscaledTime)` | 添加倒计时计时器 |
 
 ## 架构说明
 
@@ -191,6 +182,12 @@ _timerPool = new TimerObjectPool<TimerEntity>(20, timer => timer.Reset());
 - 降低垃圾回收（GC）压力
 - 提升频繁创建销毁场景下的性能
 
+### Update 优化
+
+使用两阶段更新策略，避免频繁的列表操作：
+- **第一阶段**：遍历更新所有活跃计时器
+- **第二阶段**：批量清理已停止的计时器（使用 `RemoveAll`）
+
 ### 最佳实践
 
 1. **及时清理**：在 `OnDestroy` 中移除不再需要的计时器
@@ -203,8 +200,7 @@ _timerPool = new TimerObjectPool<TimerEntity>(20, timer => timer.Reset());
 完整示例请查看 `TimeExample/TimeExample.cs` 文件，包含：
 - 一次性计时器
 - 有限/无限重复计时器
-- 帧计时器
-- 倒计时
+- 下一帧延迟执行
 - 不受时间缩放影响的计时器
 - 计时器的暂停和恢复
 
@@ -221,6 +217,24 @@ A: 这些计时器使用了 `useUnscaledTime: true` 参数，不受 TimeScale �
 
 ### Q: 修改 TimeScale 后，已有的计时器会受影响吗？
 A: 只有创建时 `useUnscaledTime` 为 `false` 的计时器会受影响。
+
+### Q: 如何实现倒计时功能？
+A: 使用重复计时器配合闭包变量即可：
+```csharp
+float remainingTime = 10f;
+TimerSystemManager.Instance.AddRepeat(0.1f, -1, data => {
+    remainingTime -= Time.deltaTime;
+    if (remainingTime > 0)
+    {
+        Debug.Log($"剩余时间：{remainingTime:F1}秒");
+    }
+    else
+    {
+        Debug.Log("倒计时完成");
+        // 停止计时器
+    }
+});
+```
 
 ## 系统要求
 
