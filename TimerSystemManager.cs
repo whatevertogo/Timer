@@ -195,8 +195,9 @@ namespace Timer
         }
 #endif
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             Shutdown();
         }
     }
